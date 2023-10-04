@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Friend, Post, User, WebSession } from "./app";
+import { Friend, Point, Post, User, WebSession } from "./app";
 import { PostDoc, PostOptions } from "./concepts/post";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
@@ -135,6 +135,24 @@ class Routes {
     const user = WebSession.getUser(session);
     const fromId = (await User.getUserByUsername(from))._id;
     return await Friend.rejectRequest(fromId, user);
+  }
+
+  @Router.get("/point")
+  async getPoints(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Point.getPoint(user);
+  }
+
+  @Router.patch("/point")
+  async updatePoint(session: WebSessionDoc, update: Partial<PostDoc>) {
+    const user = WebSession.getUser(session);
+    return await Point.update(user, update);
+  }
+
+  @Router.delete("/point")
+  async deletePoint(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return Point.delete(user);
   }
 }
 
