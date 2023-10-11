@@ -36,6 +36,7 @@
     "express-session": "^1.17.3",
     "mongodb": "^5.9.0",
     "morgan": "^1.10.0",
+    "openai": "^4.11.1",
     "reflect-metadata": "^0.1.13"
   },
   "prettier": {
