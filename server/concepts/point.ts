@@ -5,15 +5,15 @@ import { NotAllowedError } from "./errors";
 
 export interface PointDoc extends BaseDoc {
   user: ObjectId;
-  points: number;
+  point: number;
 }
 
 export default class PointConcept {
   public readonly points = new DocCollection<PointDoc>("points");
 
-  async create(user: ObjectId, points: number) {
-    const _id = await this.points.createOne({ user, points });
-    return { msg: "Post successfully created!", post: await this.points.readOne({ _id }) };
+  async create(user: ObjectId) {
+    const _id = await this.points.createOne({ user, point: 0 });
+    return { msg: "Points successfully created!", points: await this.points.readOne({ _id }) };
   }
 
   async getPoint(user: ObjectId) {
@@ -21,15 +21,50 @@ export default class PointConcept {
     return point;
   }
 
-  async update(_id: ObjectId, update: Partial<PointDoc>) {
-    this.sanitizeUpdate(update);
-    await this.points.updateOne({ _id }, update);
-    return { msg: "Post successfully updated!" };
+  async addPoint(user: ObjectId, pointsToAdd: string) {
+    const point = await this.getPoint(user);
+    if (point) {
+      const newPoint = point.point + Number(pointsToAdd);
+      await this.points.updateOne({ user }, { point: newPoint });
+      return { msg: "Point successfully updated!" };
+    }
+  }
+
+  async spendPoint(user: ObjectId, pointsToSpend: string) {
+    const point = await this.getPoint(user);
+    if (point) {
+      const newPoint = point.point - Number(pointsToSpend);
+      console.log(newPoint);
+      await this.points.updateOne({ user }, { point: newPoint });
+      return { msg: "Point successfully updated!" };
+    }
   }
 
   async delete(_id: ObjectId) {
     await this.points.deleteOne({ _id });
-    return { msg: "Post deleted successfully!" };
+    return { msg: "Point deleted successfully!" };
+  }
+
+  async canComment(user: ObjectId) {
+    const point = await this.points.readOne({ user });
+    if (point) {
+      if (point.point > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  async canSendRequest(user: ObjectId) {
+    const point = await this.points.readOne({ user });
+    if (point) {
+      if (point.point > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    }
   }
 
   private sanitizeUpdate(update: Partial<PointDoc>) {
@@ -40,14 +75,5 @@ export default class PointConcept {
         throw new NotAllowedError(`Cannot update '${key}' field!`);
       }
     }
-  }
-}
-
-export class PostAuthorNotMatchError extends NotAllowedError {
-  constructor(
-    public readonly author: ObjectId,
-    public readonly _id: ObjectId,
-  ) {
-    super("{0} is not the author of post {1}!", author, _id);
   }
 }

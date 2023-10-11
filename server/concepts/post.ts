@@ -10,15 +10,35 @@ export interface PostOptions {
 export interface PostDoc extends BaseDoc {
   author: ObjectId;
   content: string;
+  image?: string;
   options?: PostOptions;
 }
 
 export default class PostConcept {
   public readonly posts = new DocCollection<PostDoc>("posts");
 
-  async create(author: ObjectId, content: string, options?: PostOptions) {
-    const _id = await this.posts.createOne({ author, content, options });
+  async create(author: ObjectId, content: string, image?: string, options?: PostOptions) {
+    const _id = await this.posts.createOne({ author, content, image, options });
     return { msg: "Post successfully created!", post: await this.posts.readOne({ _id }) };
+  }
+
+  async idsToPost(ids: ObjectId[]) {
+    console.log(ids);
+    console.log({ _id: { $in: ids } });
+    const posts = await this.posts.readMany({ _id: { $in: ids } });
+    console.log(posts);
+    // Store strings in Map because ObjectId comparison by reference is wrong
+    const idToPost = new Map(posts.map((post) => [post._id.toString(), post]));
+    console.log(idToPost);
+    return ids.map((id) => idToPost.get(id.toString())?.content ?? "DELETED_USER");
+  }
+
+  async getPostById(_id: ObjectId) {
+    const post = await this.posts.readOne({ _id });
+    if (post === null) {
+      throw new NotFoundError(`Post not found!`);
+    }
+    return post;
   }
 
   async getPosts(query: Filter<PostDoc>) {
@@ -41,6 +61,11 @@ export default class PostConcept {
   async delete(_id: ObjectId) {
     await this.posts.deleteOne({ _id });
     return { msg: "Post deleted successfully!" };
+  }
+
+  async deleteByUser(author: ObjectId) {
+    await this.posts.deleteMany({ author: author });
+    return { msg: `All '${author}''s posts deleted successfully!` };
   }
 
   async isAuthor(user: ObjectId, _id: ObjectId) {
