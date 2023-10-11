@@ -2,7 +2,8 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Friend, Point, Post, User, WebSession } from "./app";
+import { Comment, Friend, FriendSug, Point, Post, Tag, User, WebSession } from "./app";
+import { CommentDoc } from "./concepts/comment";
 import { PostDoc, PostOptions } from "./concepts/post";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
@@ -28,7 +29,12 @@ class Routes {
   @Router.post("/users")
   async createUser(session: WebSessionDoc, username: string, password: string) {
     WebSession.isLoggedOut(session);
-    return await User.create(username, password);
+    const user = await User.create(username, password);
+    if (user.user?._id) {
+      await Point.create(user.user?._id);
+      await Tag.create(user.user?._id);
+    }
+    return user;
   }
 
   @Router.patch("/users")
@@ -41,6 +47,10 @@ class Routes {
   async deleteUser(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
     WebSession.end(session);
+    await Comment.deleteByAuthor(user);
+    await Post.deleteByUser(user);
+    await Tag.delete(user);
+    await FriendSug.delete(user);
     return await User.delete(user);
   }
 
@@ -70,9 +80,12 @@ class Routes {
   }
 
   @Router.post("/posts")
-  async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
+  async createPost(session: WebSessionDoc, content: string, image?: string, options?: PostOptions) {
     const user = WebSession.getUser(session);
-    const created = await Post.create(user, content, options);
+    const created = await Post.create(user, content, image, options);
+    const pointsToAdd = String(content.trim().split(/\s+/).length);
+    await Point.addPoint(user, pointsToAdd);
+    await Tag.update(user, content);
     return { msg: created.msg, post: await Responses.post(created.post) };
   }
 
@@ -87,7 +100,57 @@ class Routes {
   async deletePost(session: WebSessionDoc, _id: ObjectId) {
     const user = WebSession.getUser(session);
     await Post.isAuthor(user, _id);
+    await Comment.deleteByTarget(_id);
     return Post.delete(_id);
+  }
+
+  @Router.get("/comments/target/:target")
+  async getCommentsByTarget(target: ObjectId) {
+    const comments = await Comment.getByTarget(target);
+    return Responses.comments(comments);
+  }
+
+  @Router.get("/comments")
+  async getCommentsByAuthor(author?: string) {
+    let comments;
+    if (author) {
+      const id = (await User.getUserByUsername(author))._id;
+      comments = await Comment.getByAuthor(id);
+    } else {
+      comments = await Comment.getComments({});
+    }
+    return Responses.comments(comments);
+  }
+
+  @Router.delete("/comments/target/:target")
+  async deleteCommentsByTarget(target: ObjectId) {
+    return await Comment.deleteByTarget(target);
+  }
+
+  @Router.post("/comments")
+  async createComment(session: WebSessionDoc, content: string, target: ObjectId) {
+    const user = WebSession.getUser(session);
+    if (await Point.canComment(user)) {
+      const created = await Comment.create(user, target, content);
+      await Point.spendPoint(user, "2");
+      return { msg: created.msg, comment: await Responses.comment(created.comment) };
+    } else {
+      return { msg: "user does not have enough point to comment" };
+    }
+  }
+
+  @Router.patch("/comments/:_id")
+  async updateComment(session: WebSessionDoc, _id: ObjectId, update: Partial<CommentDoc>) {
+    const user = WebSession.getUser(session);
+    await Comment.isAuthor(user, _id);
+    return await Comment.update(_id, update);
+  }
+
+  @Router.delete("/comments/:_id")
+  async deleteComment(session: WebSessionDoc, _id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await Comment.isAuthor(user, _id);
+    return Comment.delete(_id);
   }
 
   @Router.get("/friends")
@@ -112,8 +175,12 @@ class Routes {
   @Router.post("/friend/requests/:to")
   async sendFriendRequest(session: WebSessionDoc, to: string) {
     const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.sendRequest(user, toId);
+    if (await Point.canSendRequest(user)) {
+      const toId = (await User.getUserByUsername(to))._id;
+      return await Friend.sendRequest(user, toId);
+    } else {
+      return { msg: "Not enough point to send a friend request" };
+    }
   }
 
   @Router.delete("/friend/requests/:to")
@@ -137,22 +204,59 @@ class Routes {
     return await Friend.rejectRequest(fromId, user);
   }
 
-  @Router.get("/point")
+  @Router.get("/points")
   async getPoints(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
     return await Point.getPoint(user);
   }
 
-  @Router.patch("/point")
-  async updatePoint(session: WebSessionDoc, update: Partial<PostDoc>) {
+  @Router.patch("/points/add/:pointsToAdd")
+  async addPoints(session: WebSessionDoc, pointsToAdd: string) {
     const user = WebSession.getUser(session);
-    return await Point.update(user, update);
+    return await Point.addPoint(user, pointsToAdd);
   }
 
-  @Router.delete("/point")
-  async deletePoint(session: WebSessionDoc) {
+  @Router.patch("/points/spend/:pointsToSpend")
+  async spendPoints(session: WebSessionDoc, pointsToSpend: string) {
     const user = WebSession.getUser(session);
-    return Point.delete(user);
+    return await Point.spendPoint(user, pointsToSpend);
+  }
+
+  @Router.get("/tags")
+  async getTags(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Tag.getByUser(user);
+  }
+
+  @Router.get("/tags/others")
+  async getOtherTags(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Tag.getOtherTags(user);
+  }
+
+  @Router.post("/friendSug")
+  async enable(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await FriendSug.enable(user);
+  }
+
+  @Router.patch("/friendSug")
+  async generateFriendSug(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    const userTags = (await Tag.getByUser(user)).userTags;
+    const otherTagsDoc = await Tag.getOtherTags(user);
+    const otherTags = new Map();
+    for (const TagDoc of otherTagsDoc) {
+      otherTags.set((await User.getUserById(TagDoc.user)).username, TagDoc.userTags);
+    }
+    const suggestion = await FriendSug.generateFriendSug(user, userTags, otherTags);
+    return suggestion;
+  }
+
+  @Router.get("/friendSug")
+  async getFriendSuggestion(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await FriendSug.getFriendSug(user);
   }
 }
 
