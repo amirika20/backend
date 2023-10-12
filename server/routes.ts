@@ -238,6 +238,7 @@ class Routes {
   @Router.post("/friendSug")
   async enable(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
+    await FriendSug.isEnabled(user);
     return await FriendSug.enable(user);
   }
 

@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
+import { NotAllowedError } from "./errors";
 
 export interface FriendSugDoc extends BaseDoc {
   user: ObjectId;
@@ -12,6 +13,15 @@ export default class FriendSugConcept {
   async enable(user: ObjectId) {
     const _id = await this.friendSug.createOne({ user, suggestion: [] });
     return { msg: "FriendSuggestion created successfully!", user: await this.friendSug.readOne({ _id }) };
+  }
+
+  async isEnabled(user: ObjectId) {
+    const suggestion = await this.friendSug.readOne({ user });
+    if (suggestion) {
+      return;
+    } else {
+      throw new AlreadyEnabledError(user);
+    }
   }
 
   async delete(user: ObjectId) {
@@ -37,6 +47,10 @@ export default class FriendSugConcept {
     await this.friendSug.updateOne({ user }, { suggestion });
     return { msg: "Generated some Friend Suggestion" };
   }
+}
 
-  //   private async areSimilar(user: ObjectId, others: Array<TagDoc>) {}
+export class AlreadyEnabledError extends NotAllowedError {
+  constructor(public readonly user: ObjectId) {
+    super("{0} already enabled friend suggestion!", user);
+  }
 }
