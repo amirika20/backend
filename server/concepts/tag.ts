@@ -42,8 +42,8 @@ export default class TagConcept {
 
   async update(user: ObjectId, content: string) {
     const tags = await this.generateTags(content);
-    const _id = await this.tags.updateOne({ user }, { userTags: tags });
-    return { msg: "Tags successfully updated!", tags: this.tags.readOne({ _id }) };
+    await this.tags.updateOne({ user }, { userTags: tags });
+    return { msg: "Tags successfully updated!" };
   }
 
   async delete(user: ObjectId) {
