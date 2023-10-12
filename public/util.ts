@@ -192,6 +192,12 @@ const operations: operation[] = [
     fields: {},
   },
   {
+    name: "Disable Friend Suggestion",
+    endpoint: "/api/friendSug",
+    method: "DELETE",
+    fields: {},
+  },
+  {
     name: "Generate Friend Suggestion",
     endpoint: "/api/friendSug",
     method: "PATCH",
