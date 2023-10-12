@@ -1,5 +1,4 @@
 import { ObjectId } from "mongodb";
-
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { NotAllowedError } from "./errors";
 
@@ -34,7 +33,6 @@ export default class PointConcept {
     const point = await this.getPoint(user);
     if (point) {
       const newPoint = point.point - Number(pointsToSpend);
-      console.log(newPoint);
       await this.points.updateOne({ user }, { point: newPoint });
       return { msg: "Point successfully updated!" };
     }
@@ -51,7 +49,7 @@ export default class PointConcept {
       if (point.point > 0) {
         return true;
       } else {
-        return false;
+        throw new NotEnoughPointError(point.user);
       }
     }
   }
@@ -62,18 +60,14 @@ export default class PointConcept {
       if (point.point > 0) {
         return true;
       } else {
-        return false;
+        throw new NotEnoughPointError(point.user);
       }
     }
   }
+}
 
-  private sanitizeUpdate(update: Partial<PointDoc>) {
-    // Make sure the update cannot change the author.
-    const allowedUpdates = ["points"];
-    for (const key in update) {
-      if (!allowedUpdates.includes(key)) {
-        throw new NotAllowedError(`Cannot update '${key}' field!`);
-      }
-    }
+export class NotEnoughPointError extends NotAllowedError {
+  constructor(public readonly user: ObjectId) {
+    super("{0} does not have enough point!", user);
   }
 }

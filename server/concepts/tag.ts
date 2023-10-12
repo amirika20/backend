@@ -1,7 +1,6 @@
 import { Filter, ObjectId } from "mongodb";
 import OpenAI from "openai";
 import DocCollection, { BaseDoc } from "../framework/doc";
-import { NotAllowedError } from "./errors";
 const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
@@ -43,8 +42,8 @@ export default class TagConcept {
 
   async update(user: ObjectId, content: string) {
     const tags = await this.generateTags(content);
-    await this.tags.updateOne({ user }, { userTags: tags });
-    return { msg: "Tags successfully updated!" };
+    const _id = await this.tags.updateOne({ user }, { userTags: tags });
+    return { msg: "Tags successfully updated!", tags: this.tags.readOne({ _id }) };
   }
 
   async delete(user: ObjectId) {
@@ -53,7 +52,6 @@ export default class TagConcept {
   }
 
   private async generateTags(data: string) {
-    // Create user prompt
     // prompt to be fed into the chat-gpt-api
     const userPrompt =
       "Assign multiple topics as an array from the topic list given below to the following quote:\nQuote - " +
@@ -85,17 +83,6 @@ export default class TagConcept {
 
     // Match generated topics with default tags and create result object
     const result = generatedTopics?.filter((tag) => this.defaultTags.includes(tag));
-    console.log(result);
     return result;
-    // const generatedTopics = topicsArr.map((str) => str.toLowerCase());
-  }
-}
-
-export class PostAuthorNotMatchError extends NotAllowedError {
-  constructor(
-    public readonly author: ObjectId,
-    public readonly _id: ObjectId,
-  ) {
-    super("{0} is not the author of post {1}!", author, _id);
   }
 }

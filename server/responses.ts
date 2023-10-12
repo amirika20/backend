@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { Post, User } from "./app";
-import { CommentDoc } from "./concepts/comment";
+import { CommentAuthorNotMatchError, CommentDoc } from "./concepts/comment";
 import { AlreadyFriendsError, FriendNotFoundError, FriendRequestAlreadyExistsError, FriendRequestDoc, FriendRequestNotFoundError } from "./concepts/friend";
 import { PostAuthorNotMatchError, PostDoc } from "./concepts/post";
 import { Router } from "./framework/router";
@@ -62,6 +62,11 @@ export default class Responses {
 }
 
 Router.registerError(PostAuthorNotMatchError, async (e) => {
+  const username = (await User.getUserById(e.author)).username;
+  return e.formatWith(username, e._id);
+});
+
+Router.registerError(CommentAuthorNotMatchError, async (e) => {
   const username = (await User.getUserById(e.author)).username;
   return e.formatWith(username, e._id);
 });

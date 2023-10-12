@@ -150,6 +150,7 @@ class Routes {
   async deleteComment(session: WebSessionDoc, _id: ObjectId) {
     const user = WebSession.getUser(session);
     await Comment.isAuthor(user, _id);
+    await Comment.deleteByTarget(_id);
     return Comment.delete(_id);
   }
 
