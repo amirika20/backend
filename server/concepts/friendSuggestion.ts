@@ -15,12 +15,29 @@ export default class FriendSugConcept {
     return { msg: "FriendSuggestion created successfully!", user: await this.friendSug.readOne({ _id }) };
   }
 
+  async disable(user: ObjectId) {
+    await this.isDisabled(user);
+    await this.friendSug.deleteMany({ user: user });
+    return { msg: "Disabled successfully!" };
+  }
+
+  async isDisabled(user: ObjectId) {
+    const suggestion = await this.friendSug.readOne({ user: user });
+    console.log(suggestion);
+    if (!suggestion) {
+      throw new IsNotEnabledError(user);
+    } else {
+      return;
+    }
+  }
+
   async isEnabled(user: ObjectId) {
     const suggestion = await this.friendSug.readOne({ user: user });
+    console.log(suggestion);
     if (suggestion) {
-      return;
-    } else {
       throw new AlreadyEnabledError(user);
+    } else {
+      return;
     }
   }
 
@@ -34,6 +51,7 @@ export default class FriendSugConcept {
 
   async generateFriendSug(user: ObjectId, userTags: Array<string>, otherTags: Map<string, [string]>) {
     // const _id = await this.friendSug.readOne({ user });
+    await this.isDisabled(user);
     const suggestion = [];
     for (const [username, tags] of otherTags) {
       for (const tag of tags) {
@@ -52,5 +70,17 @@ export default class FriendSugConcept {
 export class AlreadyEnabledError extends NotAllowedError {
   constructor(public readonly user: ObjectId) {
     super("{0} already enabled friend suggestion!", user);
+  }
+}
+
+export class AlreadyDisabledError extends NotAllowedError {
+  constructor(public readonly user: ObjectId) {
+    super("{0} already disabled friend suggestion!", user);
+  }
+}
+
+export class IsNotEnabledError extends NotAllowedError {
+  constructor(public readonly user: ObjectId) {
+    super("{0} has not enabled friend suggestion!", user);
   }
 }

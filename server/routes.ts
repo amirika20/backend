@@ -242,6 +242,12 @@ class Routes {
     return await FriendSug.enable(user);
   }
 
+  @Router.delete("/friendSug")
+  async disable(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await FriendSug.disable(user);
+  }
+
   @Router.patch("/friendSug")
   async generateFriendSug(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
