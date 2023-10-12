@@ -16,7 +16,7 @@ export default class FriendSugConcept {
   }
 
   async isEnabled(user: ObjectId) {
-    const suggestion = await this.friendSug.readOne({ user });
+    const suggestion = await this.friendSug.readOne({ user: user });
     if (suggestion) {
       return;
     } else {
